@@ -3,8 +3,97 @@ import streamlit as st
 
 st.set_page_config(page_title="ReadGenius", page_icon="📚", layout="centered")
 
-st.title("📚 ReadGenius")
-st.write("Reading comprehension, book recommendations, and phonics practice — all in one place.")
+# ---------------------------------------------------------------------------
+# Theme: library / book-cover aesthetic
+# Ink navy + library green + gilt gold on a soft sage paper background.
+# Body text uses Atkinson Hyperlegible — a typeface designed by the Braille
+# Institute specifically for reading clarity, which fits a literacy tool.
+# ---------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+
+    html, body, [class*="st-"] {
+        font-family: 'Atkinson Hyperlegible', sans-serif;
+    }
+    h1, h2, h3, .stTabs [data-baseweb="tab"] p {
+        font-family: 'Fraunces', serif !important;
+    }
+
+    .rg-header {
+        background: #1F2A3C;
+        padding: 1.8rem 2rem 1.5rem 2rem;
+        border-radius: 10px;
+        margin-bottom: 1.6rem;
+        border-bottom: 4px solid #C99A3E;
+    }
+    .rg-header h1 {
+        color: #F6F4EE !important;
+        font-weight: 700;
+        font-size: 2.2rem;
+        letter-spacing: 0.01em;
+        margin: 0;
+    }
+    .rg-header p {
+        color: #C9D1C6;
+        margin: 0.4rem 0 0 0;
+        font-size: 1rem;
+    }
+
+    .rg-badge {
+        display: inline-block;
+        border: 1.5px dashed #C99A3E;
+        color: #2F5D50;
+        padding: 0.15rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+    }
+
+    .rg-card {
+        background: #FFFFFF;
+        border-left: 4px solid #C99A3E;
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin-top: 0.6rem;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 4px;
+        border-bottom: 2px solid #DDE2D8;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent;
+        border-radius: 8px 8px 0 0;
+        padding: 0.6rem 1.2rem;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF;
+        border-bottom: 3px solid #2F5D50;
+    }
+
+    .stButton button {
+        border-radius: 8px;
+        font-weight: 700;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div class="rg-header">
+        <h1>📚 ReadGenius</h1>
+        <p>Reading comprehension, book recommendations, and phonics practice — all in one place.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 tab1, tab2, tab3 = st.tabs(["📖 Comprehension", "🔎 Book Finder", "🔤 Phonics"])
 
@@ -343,7 +432,10 @@ with tab1:
         passage = next(p for p in filtered if p["title"] == st.session_state.current_title)
 
         st.subheader(passage["title"])
-        st.caption(f"Genre: {passage['genre']} · {passage['word_count']} words")
+        st.markdown(
+            f'<span class="rg-badge">{passage["genre"]} · {passage["word_count"]} words</span>',
+            unsafe_allow_html=True,
+        )
         st.write(passage["text"])
 
         st.divider()
@@ -361,13 +453,19 @@ with tab1:
                     st.error(f"Not quite — the answer is: {item['answer']}")
 
         st.divider()
-        st.write("**🔤 Phonics focus for this text**")
-        st.write(
-            f"This passage practises the sounds: "
-            f"{', '.join(f'`{s}`' for s in passage['phonics_focus'])}"
+        phonics_sounds = ", ".join(f"<code>{s}</code>" for s in passage["phonics_focus"])
+        phonics_words_html = ", ".join(f"<strong>{w}</strong>" for w in passage["phonics_words"])
+        st.markdown(
+            f"""
+            <div class="rg-card">
+                <strong>🔤 Phonics focus for this text</strong><br>
+                This passage practises the sounds: {phonics_sounds}<br><br>
+                Spot these sounds in words from the passage:<br>
+                {phonics_words_html}
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.write("Spot these sounds in words from the passage:")
-        st.write(", ".join(f"**{w}**" for w in passage["phonics_words"]))
         st.caption("Ask pupils to find and read these words aloud in the passage above, or spot other words with the same sounds.")
 
 # ---------------------------------------------------------------------------
@@ -385,6 +483,7 @@ BOOK_LIBRARY = {
 }
 
 with tab2:
+    st.subheader("Find the right book")
     st.write("Answer two quick questions to get book suggestions.")
 
     age_group = st.selectbox("Age group", ["5-7", "8-11"])
@@ -408,6 +507,7 @@ PHONICS_WORDS = [
 ]
 
 with tab3:
+    st.subheader("Sound it out")
     if "phonics_idx" not in st.session_state:
         st.session_state.phonics_idx = random.randrange(len(PHONICS_WORDS))
 
