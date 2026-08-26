@@ -1,4 +1,5 @@
 import streamlit as st
+from library_data import LIBRARY
 
 st.set_page_config(page_title="ReadGenius", page_icon="📚", layout="centered")
 
@@ -54,6 +55,10 @@ st.markdown(
     .vb-E { background: #E6F1FB; color: #0C447C; }
     .vb-R { background: #EAF3DE; color: #3B6D11; }
 
+    .rg-phonicslink {
+        background: #F6F4EE; border: 1.5px dashed #2F5D50; border-radius: 6px;
+        padding: 0.7rem 1rem; margin: 0.5rem 0 1rem 0; font-size: 0.92rem;
+    }
     .rg-progress-label { font-size: 0.85rem; color: #5F5E5A; margin-bottom: 0.3rem; }
 
     .stTabs [data-baseweb="tab-list"] { gap: 4px; border-bottom: 2px solid #DDE2D8; }
@@ -167,6 +172,8 @@ if "n_phonics" not in st.session_state:
     st.session_state.n_phonics = len(DEFAULT_PHONICS)
 if "n_vipers" not in st.session_state:
     st.session_state.n_vipers = len(DEFAULT_VIPERS)
+if "loaded_from_library" not in st.session_state:
+    st.session_state.loaded_from_library = False
 
 def esc(s):
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -182,6 +189,68 @@ with tab1:
     # TEACHER VIEW
     # -----------------------------------------------------------------
     if st.session_state.rg_view == "teacher":
+        st.subheader("Start from the text library, or write your own")
+        source_mode = st.radio(
+            "Source", ["📚 Browse text library", "✍️ Write your own passage"],
+            horizontal=True, label_visibility="collapsed",
+        )
+
+        if source_mode == "📚 Browse text library":
+            years = ["Any"] + sorted({p["year"] for p in LIBRARY})
+            genres = ["Any"] + sorted({p["genre"] for p in LIBRARY})
+
+            fc1, fc2, fc3 = st.columns(3)
+            year_choice = fc1.selectbox("Year group", years)
+            genre_choice = fc2.selectbox("Genre", genres)
+            length_choice = fc3.selectbox("Text length", ["Any", "~100 words", "~200 words", "~300 words", "~400 words"])
+
+            def bucket(wc):
+                return min([100, 200, 300, 400], key=lambda b: abs(b - wc))
+
+            length_map = {"~100 words": 100, "~200 words": 200, "~300 words": 300, "~400 words": 400}
+
+            matches = [
+                p for p in LIBRARY
+                if (year_choice == "Any" or p["year"] == year_choice)
+                and (genre_choice == "Any" or p["genre"] == genre_choice)
+                and (length_choice == "Any" or bucket(p["word_count"]) == length_map[length_choice])
+            ]
+
+            st.caption(f"{len(matches)} text(s) match.")
+
+            if not matches:
+                st.warning("No texts match that combination yet — try widening your filters. The library is still growing.")
+            else:
+                titles = [f"{p['title']} ({p['year']} · {p['genre']} · {p['word_count']}w)" for p in matches]
+                pick = st.selectbox("Choose a text", titles)
+                chosen = matches[titles.index(pick)]
+
+                st.markdown(f'<div class="rg-passage">{chosen["text"].replace(chr(10)+chr(10), "<br><br>")}</div>', unsafe_allow_html=True)
+
+                sounds = ", ".join(f"`{s}`" for s in chosen["phonics_focus"])
+                words = ", ".join(f"**{w}**" for w in chosen["phonics_words"])
+                st.markdown(
+                    f'<div class="rg-phonicslink">🔤 <strong>Phonics link for this text:</strong> practises {sounds}<br>'
+                    f'Example words to spot: {words}</div>',
+                    unsafe_allow_html=True,
+                )
+
+                if st.button("📥 Load this text into the builder", type="primary"):
+                    st.session_state.t_title = chosen["title"]
+                    st.session_state.t_subtitle = f"{chosen['year']} · {chosen['genre']}"
+                    st.session_state.t_passage = chosen["text"]
+                    st.session_state.n_vocab = len(chosen["vocab"])
+                    for i, (w, d) in enumerate(chosen["vocab"]):
+                        st.session_state[f"vocab_word_{i}"] = w
+                        st.session_state[f"vocab_def_{i}"] = d
+                    st.session_state.n_phonics = 0
+                    st.session_state.n_vipers = 0
+                    st.session_state.loaded_from_library = True
+                    st.rerun()
+
+            st.markdown("---")
+            st.caption("Once loaded below, add your own phonics tile questions and VIPERS comprehension questions for this text, then launch.")
+
         st.subheader("1. Activity details")
         st.text_input("Story / activity title", value=DEFAULT_TITLE, key="t_title")
         st.text_input("Pupil-facing subtitle (optional)", value=DEFAULT_SUBTITLE, key="t_subtitle")
@@ -211,7 +280,7 @@ with tab1:
         for i in range(st.session_state.n_phonics):
             with st.container():
                 st.markdown(f"**Phonics question {i+1}**")
-                dp = DEFAULT_PHONICS[i] if i < len(DEFAULT_PHONICS) else {"prompt": "", "tiles": ["", "", "", ""], "correct": 0, "expl": ""}
+                dp = DEFAULT_PHONICS[i] if (i < len(DEFAULT_PHONICS) and not st.session_state.loaded_from_library) else {"prompt": "", "tiles": ["", "", "", ""], "correct": 0, "expl": ""}
                 st.text_input("Prompt", value=dp["prompt"], key=f"ph_prompt_{i}")
                 tc = st.columns(4)
                 for t in range(4):
@@ -238,7 +307,7 @@ with tab1:
                     f'<span class="rg-vipbadge {cls}">{letter} – {label}</span>',
                     unsafe_allow_html=True,
                 )
-                dv = DEFAULT_VIPERS[i] if i < len(DEFAULT_VIPERS) else {"q": "", "opts": ["", "", "", ""], "correct": 0, "fb": ""}
+                dv = DEFAULT_VIPERS[i] if (i < len(DEFAULT_VIPERS) and not st.session_state.loaded_from_library) else {"q": "", "opts": ["", "", "", ""], "correct": 0, "fb": ""}
                 st.text_area("Question", value=dv["q"], key=f"vip_q_{i}", height=68)
                 oc = st.columns(2)
                 for o in range(4):
