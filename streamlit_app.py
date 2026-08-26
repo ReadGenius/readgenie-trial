@@ -225,7 +225,8 @@ with tab1:
                 pick = st.selectbox("Choose a text", titles)
                 chosen = matches[titles.index(pick)]
 
-                st.markdown(f'<div class="rg-passage">{chosen["text"].replace(chr(10)+chr(10), "<br><br>")}</div>', unsafe_allow_html=True)
+                preview_html = esc(chosen["text"]).replace("\n\n", "<br><br>")
+                st.markdown(f'<div class="rg-passage">{preview_html}</div>', unsafe_allow_html=True)
 
                 sounds = ", ".join(f"`{s}`" for s in chosen["phonics_focus"])
                 words = ", ".join(f"**{w}**" for w in chosen["phonics_words"])
@@ -239,6 +240,25 @@ with tab1:
                     st.session_state.t_title = chosen["title"]
                     st.session_state.t_subtitle = f"{chosen['year']} · {chosen['genre']}"
                     st.session_state.t_passage = chosen["text"]
+
+                    # Clear any leftover fields from a previously loaded text so old
+                    # phonics/VIPERS questions don't reappear when new ones are added
+                    for i in range(12):
+                        st.session_state.pop(f"vocab_word_{i}", None)
+                        st.session_state.pop(f"vocab_def_{i}", None)
+                    for i in range(3):
+                        st.session_state.pop(f"ph_prompt_{i}", None)
+                        st.session_state.pop(f"ph_correct_{i}", None)
+                        st.session_state.pop(f"ph_expl_{i}", None)
+                        for t in range(4):
+                            st.session_state.pop(f"ph_tile_{i}_{t}", None)
+                    for i in range(5):
+                        st.session_state.pop(f"vip_q_{i}", None)
+                        st.session_state.pop(f"vip_correct_{i}", None)
+                        st.session_state.pop(f"vip_fb_{i}", None)
+                        for o in range(4):
+                            st.session_state.pop(f"vip_opt_{i}_{o}", None)
+
                     st.session_state.n_vocab = len(chosen["vocab"])
                     for i, (w, d) in enumerate(chosen["vocab"]):
                         st.session_state[f"vocab_word_{i}"] = w
@@ -277,6 +297,8 @@ with tab1:
 
         st.subheader("4. Phonics questions")
         st.caption("Up to 3. Pupils pick the correct tile from up to 4 options.")
+        if st.session_state.n_phonics == 0:
+            st.info("No phonics questions yet for this text — click '+ Add phonics question' below to write one.")
         for i in range(st.session_state.n_phonics):
             with st.container():
                 st.markdown(f"**Phonics question {i+1}**")
@@ -300,6 +322,8 @@ with tab1:
 
         st.subheader("5. Comprehension questions (VIPERS)")
         st.caption("Up to 5 — Vocabulary, Infer, Predict, Explain, Retrieve.")
+        if st.session_state.n_vipers == 0:
+            st.info("No comprehension questions yet for this text — click '+ Add comprehension question' below to write one.")
         for i in range(st.session_state.n_vipers):
             letter, label, cls = VIP_LABELS[i % 5]
             with st.container():
